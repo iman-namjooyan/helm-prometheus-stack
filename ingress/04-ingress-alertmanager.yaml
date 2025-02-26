@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+#    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required '
+#    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+#    nginx.ingress.kubernetes.io/auth-type: basic
+#    nginx.ingress.kubernetes.io/proxy-body-size: 10000m
+#    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  name: ingress-alertmanager
+  namespace: monitoring
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: alert.local
+    http:
+      paths:
+      - backend:
+          service:
+            name: prometheus-stack-kube-prom-alertmanager
+            port:
+              number: 9093
+        path: /
+        pathType: Prefix

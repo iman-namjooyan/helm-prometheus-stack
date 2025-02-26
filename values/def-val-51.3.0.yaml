@@ -1,0 +1,181 @@
+#==============================[Alert Manager Configuration]
+# Note: Private registry address is: 192.168.1.17
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    image:
+      registry: 192.168.1.17:8083
+      repository: prometheus/alertmanager
+      tag: v0.26.0
+      sha: ""
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+  config:
+    global:
+      resolve_timeout: 5m
+      smtp_require_tls: false
+    inhibit_rules:
+      - source_matchers:
+          - 'severity = critical'
+        target_matchers:
+          - 'severity =~ warning|info'
+        equal:
+          - 'namespace'
+          - 'alertname'
+      - source_matchers:
+          - 'severity = warning'
+        target_matchers:
+          - 'severity = info'
+        equal:
+          - 'namespace'
+          - 'alertname'
+      - source_matchers:
+          - 'alertname = InfoInhibitor'
+        target_matchers:
+          - 'severity = info'
+        equal:
+          - 'namespace'
+    route:
+      group_by: ['alertname','namespace']
+      receiver: 'email-alert'
+      routes:
+        - receiver: 'email-alert'
+          group_wait: 50s
+          group_interval: 5m
+          repeat_interval: 12h
+    receivers:
+    - name: 'email-alert'
+      email_configs:
+      - to: im.namjuyan@gmail.com
+        from: monitoring@testcompany.com
+        smarthost: mail.testcompany.com:25
+        auth_username: monitoring@testcompany.com
+        auth_identity: monitoring@testcompany.com
+        auth_password: Test1234
+        require_tls: false
+        send_resolved: true
+#==============================[Prometheus Operator]
+prometheusOperator:
+  admissionWebhooks:
+    patch:
+      enabled: true
+      image:
+        registry: 192.168.1.17:8083
+        repository: prometheus/ingress-nginx/kube-webhook-certgen
+        tag: v20221220-controller-v1.5.1-58-g787ea74b6
+        sha: ""
+        pullPolicy: IfNotPresent
+      resources: {}
+
+  image:
+    registry: 192.168.1.17:8083
+    repository: prometheus/prometheus-operator/prometheus-operator
+    # if not set appVersion field from Chart.yaml is used
+    tag: "v0.68.0"
+    sha: ""
+    pullPolicy: IfNotPresent
+
+  prometheusConfigReloader:
+    image:
+      registry: 192.168.1.17:8083
+      repository: prometheus/prometheus-operator/prometheus-config-reloader
+      # if not set appVersion field from Chart.yaml is used
+      tag: "v0.68.0"
+      sha: ""
+#==============================[Thanos]
+thanosRuler:
+  thanosRulerSpec:
+    image:
+      registry: 192.168.1.17:8083
+      repository: prometheus/thanos/thanos
+      tag: "v0.32.4"
+#==============================[Use PVC with longhorn storage class for Prometheus]
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 30Gi
+    secrets: ['etcd-client-cert']
+    image:
+      registry: 192.168.1.17:8083
+      repository: prometheus/prometheus
+      tag: v2.47.0
+      sha: ""
+#Metric Data Retention
+    retention: 30d
+
+#==============================[External Etcd configuration]
+kubeEtcd:
+  enabled: true
+  endpoints:
+   - 10.0.82.100
+   - 10.0.82.101
+   - 10.0.82.102
+  service:
+    enabled: true
+    port: 2379
+    targetPort: 2379
+  serviceMonitor:
+    enabled: true
+    scheme: https
+    insecureSkipVerify: false
+    serverName: localhost
+    caFile: /etc/prometheus/secrets/etcd-client-cert/ca.pem
+    certFile: /etc/prometheus/secrets/etcd-client-cert/etcd-cert.pem
+    keyFile: /etc/prometheus/secrets/etcd-client-cert/etcd-key.pem
+    interval: ""
+    sampleLimit: 0
+    targetLimit: 0
+    labelNameLengthLimit: 0
+    labelValueLengthLimit: 0
+    metricRelablelings: []
+    relabelings: []
+    additionalLabels: {}
+
+#==============================[Grafana Configuration]
+grafana:
+  defaultDashboardsTimezone: "Europe/Berlin"
+  adminPassword: Grafana@1234
+  persistence:
+    type: pvc
+    enabled: true
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+  image:
+    repository: 192.168.1.17:8083/prometheus/grafana/grafana
+    tag: "10.1.2"
+  testFramework:
+    image: 192.168.1.17:8083/prometheus/bats/bats
+    tag: "v1.4.1"
+  initChownData:
+    image:
+      repository: 192.168.1.17:8083/prometheus/library/busybox
+      tag: "1.31.1"
+  sidecar:
+    image:
+      repository: 192.168.1.17:8083/prometheus/kiwigrid/k8s-sidecar
+      tag: 1.25.1
+#==============================[Disable nodeExporter monitoring]
+nodeExporter:
+  enabled: false
+
+kube-state-metrics:
+  image:
+    registry: 192.168.1.17:8083
+    repository: prometheus/kube-state-metrics/kube-state-metrics
+    tag: "v2.10.0"
+#==============================[Disable kubeproxy monitoring]
+kubeProxy:
+  enabled: false
